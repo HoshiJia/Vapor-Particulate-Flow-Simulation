@@ -201,7 +201,8 @@ void vaporCollision(Particle * vpp, int num, int elastic = 1)
 							rel_v[0] = vpp->vel_x[i] - vpp->vel_x[j];
 							rel_v[1] = vpp->vel_y[i] - vpp->vel_y[j];
 							cm_v[0] = (vpp->mass[i] * vpp->vel_x[i] + vpp->mass[j] * vpp->vel_x[j]) / t_mass;
-							cm_v[0] = (vpp->mass[i] * vpp->vel_y[i] + vpp->mass[j] * vpp->vel_y[j]) / t_mass;
+							cm_v[1] = (vpp->mass[i] * vpp->vel_y[i] + vpp->mass[j] * vpp->vel_y[j]) / t_mass;
+							
 							// relative velocity over relative direction
 							rel_vr = rel_v[0] * rel_r[0] + rel_v[1] * rel_r[1];
 							// recoiling relative velocities
@@ -302,7 +303,7 @@ int main()
 
 	// particle number smaller than 65535
 	signed short int par_num = 200;
-	signed short int par_wid = 5;
+	signed short int par_wid = 20;
 
 	// model width per border [m]
 	float width = 2;
@@ -377,7 +378,7 @@ int main()
 			}
 		}
 
-
+		/*
 		if (now_step % 100 == 0) {
 			for (int i = 0; i < vapor.loc_x.size(); ++i) {
 				out_locx << vapor.loc_x[i];
@@ -387,7 +388,8 @@ int main()
 			}
 			out_locx << endl;
 			out_locy << endl;
-		}
+		}*/
+		
 	}
 
 	out_locx.close();

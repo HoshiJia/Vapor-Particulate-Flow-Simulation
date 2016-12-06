@@ -34,6 +34,9 @@ struct Particle {
 	vector<float> vel_x;
 	vector<float> vel_y;
 	vector<float> radius;
+	vector<float> interp;
+	vector<float> bubb_vx;
+	vector<float> bubb_vy;
 	vector<int> region;
 };
 
@@ -45,6 +48,9 @@ Particle createVapor(int num, int par_wid, float par_mass, float par_radius, flo
 		vector<float> vel_x(num);
 		vector<float> vel_y(num);
 		vector<float> radius(num);
+		vector<float> interp(num);
+		vector<float> bubb_vx(num);
+		vector<float> bubb_vy(num);
 		vector<int> region(num);
 		
 		int par_len = num / par_wid;
@@ -52,17 +58,20 @@ Particle createVapor(int num, int par_wid, float par_mass, float par_radius, flo
 
 		for (int i = 0; i< par_len; ++i) {
 			for (int j = 0; j < par_wid; ++j) {
-				loc_x[par_ord] = 1 + par_radius * 2.5 * pow(-1, j) * ceil(j / 2.0);
-				loc_y[par_ord] = 0.5 + par_radius * 2.5 * i;
+				loc_x[par_ord] = 1 + par_radius * 3 * pow(-1, j) * ceil(j / 2.0);
+				loc_y[par_ord] = 0.5 + par_radius * 3 * i;
 				mass[par_ord] = par_mass;
 				vel_x[par_ord] = 0;
 				vel_y[par_ord] = par_vel;
 				radius[par_ord] = par_radius;
 				region[par_ord] = -1;
+				interp[par_ord] = 0.0;
+				bubb_vx[par_ord] = 0.0;
+				bubb_vy[par_ord] = 0.0;
 				par_ord++;
 			}
 		}
-		return{ mass, loc_x, loc_y, vel_x, vel_y, radius, region };
+		return{ mass, loc_x, loc_y, vel_x, vel_y, radius, interp, bubb_vx, bubb_vy, region };
 
 }
 
@@ -151,13 +160,52 @@ void updateState(Particle * vpp, float dt, int num)
 {	
 	float dec_x = 0;
 	float dec_y = 0;
+	
+	// bubble deceleration or acceleration due to forces
+	float a = 9.8 * (1000 - 48.7) / 48.7;
+	float b = 3.0 / 8.0 * 0.44 * 1000 / 48.7;
+
+	float abs_a, abs_b, rel_vx, rel_vy;
 
 	for (int i = 0; i < num; ++i) {
 		vpp->loc_x[i] += vpp->vel_x[i] * dt;
 		vpp->loc_y[i] += vpp->vel_y[i] * dt;
 		
-		vpp->vel_x[i] -= dec_x * dt;
-		vpp->vel_y[i] -= dec_y * dt;
+		rel_vx = vpp->bubb_vx[i] - vpp->vel_x[i];
+		rel_vy = vpp->bubb_vy[i] - vpp->vel_y[i];
+
+		if (rel_vx >=0) {
+			abs_a = -1;
+		}
+		else {
+			abs_a = 1;
+		}
+
+		if (rel_vy >=0) {
+			abs_b = -1;
+		}
+		else {
+			abs_b = 1;
+		}
+
+		dec_x = b * abs_a * pow(rel_vx,2) / vpp->radius[i];
+		dec_y = b * abs_b * pow(rel_vy,2) / vpp->radius[i];
+
+		/*
+		cout << vpp->bubb_vx[i] << endl;
+		cout << vpp->bubb_vy[i] << endl;
+		cout << vpp->vel_y[i] << endl;
+		cout << dec_y << endl;
+		cout << dec_x << endl;
+		*/
+
+		vpp->vel_x[i] += dec_x * dt;
+		vpp->vel_y[i] += dec_y * dt;
+
+		// initial flow-phase values
+		vpp->interp[i] = 0.0;
+		vpp->bubb_vx[i] = 0.0;
+		vpp->bubb_vy[i] = 0.0;
 		//cout << vpp->vel_y[i] << endl;
 	}
 }
@@ -165,31 +213,29 @@ void updateState(Particle * vpp, float dt, int num)
 // vapor inter-collision model
 void vaporCollision(Particle * vpp, int num, int elastic = 1)
 {	
-	float dis_x, dis_y, dis, dis_safe;
-	for (int i = 0; i < num - 1; ++i) {
+	float dis_x, dis_y, dis, dis_safe, dis_ref;
+	dis_ref = 0.0015; // reference redius
+	for (int i = 0; i < num; ++i) {
 		// if particle 1 leaks out
 		if (vpp->region[i] == -2) {
 			continue;
 		}
-		for (int j = i + 1; j < num; ++j) {
+		for (int j = 0; j < num; ++j) {
 			// if particle 2 leaks out
-			if (vpp->region[j] == -2) {
+			if (vpp->region[j] == -2 || j == i) {
 				continue;
 			}
 			dis_x = vpp->loc_x[i] - vpp->loc_x[j];
-			dis_safe = vpp->radius[i] + vpp->radius[j];
+			dis_y = vpp->loc_y[i] - vpp->loc_y[j];
 			// if the horizontal distance is beyond a safe distance
-			if (dis_x > dis_safe) {
+			if (dis_x > dis_ref || dis_y > dis_ref) {
 				continue;
 			}
 			else{
-				// if the vertical distance is beyond a safe distance
-				dis_y = vpp->loc_y[i] - vpp->loc_y[j];
-				if (dis_y > dis_safe) {
-					continue;
-				}
-				else{
-					dis = sqrt(pow(dis_x,2) + pow(dis_y,2));
+				dis_safe = vpp->radius[i] + vpp->radius[j];
+				dis = sqrt(pow(dis_x,2) + pow(dis_y,2));
+				if (dis < dis_ref) {
+					vpp->interp[i] += (dis_ref / dis - 1);
 					// if true distance is smaller than a safe distance, collision happens
 					if (dis < dis_safe) {
 						if (elastic == 1) {
@@ -206,20 +252,32 @@ void vaporCollision(Particle * vpp, int num, int elastic = 1)
 							// relative velocity over relative direction
 							rel_vr = rel_v[0] * rel_r[0] + rel_v[1] * rel_r[1];
 							// recoiling relative velocities
-							rel_v[0] = 2 * rel_r[0] * rel_vr / dis - rel_v[0];
-							rel_v[1] = 2 * rel_r[1] * rel_vr / dis - rel_v[1];
+							rel_v[0] = 2 * rel_r[0] * rel_vr / dis / dis - rel_v[0];
+							rel_v[1] = 2 * rel_r[1] * rel_vr / dis / dis - rel_v[1];
 							// assign new velocities
 							vpp->vel_x[i] = cm_v[0] + rel_v[0] * vpp->mass[j] / t_mass;
 							vpp->vel_y[i] = cm_v[1] + rel_v[1] * vpp->mass[j] / t_mass;
-							vpp->vel_x[j] = cm_v[0] + rel_v[0] * vpp->mass[i] / t_mass;
-							vpp->vel_y[j] = cm_v[1] + rel_v[1] * vpp->mass[i] / t_mass;
+							vpp->vel_x[j] = cm_v[0] - rel_v[0] * vpp->mass[i] / t_mass;
+							vpp->vel_y[j] = cm_v[1] - rel_v[1] * vpp->mass[i] / t_mass;
 
 						}
 					}
+
+					// flow-phase velocity
+					vpp->bubb_vx[i] += (dis_ref / dis - 1) * vpp->vel_x[i];
+					vpp->bubb_vy[i] += (dis_ref / dis - 1) * vpp->vel_y[i];
 				}
 			}
 		}
-
+		// average by total coefficient
+		if (vpp->interp[i] == 0.) {
+			vpp->bubb_vx[i] = 0;
+			vpp->bubb_vy[i] = 0;
+		}
+		else {
+			vpp->bubb_vx[i] = vpp->bubb_vx[i] / vpp->interp[i];
+			vpp->bubb_vy[i] = vpp->bubb_vy[i] / vpp->interp[i];
+		}
 	}
 }
 
@@ -302,8 +360,8 @@ int main()
 	signed int now_step = 1;
 
 	// particle number smaller than 65535
-	signed short int par_num = 200;
-	signed short int par_wid = 20;
+	signed short int par_num = 50;
+	signed short int par_wid = 5;
 
 	// model width per border [m]
 	float width = 2;
@@ -332,7 +390,6 @@ int main()
 	// temperature of both phases [K]
 	float temp = 778;
 
-	
 	Initialize input = initialCondition(dia_break, up_pre, down_pre, temp);
 
 	Particle vapor = createVapor(par_num, par_wid, input.ave_mass, input.ave_diam /2, input.ave_vel);
@@ -349,8 +406,9 @@ int main()
 
 	for (int now_step = 0; now_step < steps; ++now_step){
 		//cout << now_step << endl;
-		updateState(&vapor, dt, par_num);
 		vaporCollision(&vapor, par_num, elastic);
+
+		updateState(&vapor, dt, par_num);
 
 		if (now_step % 10 != 0) {
 			for (int p = 0; p < par_num; ++p) {
@@ -378,8 +436,8 @@ int main()
 			}
 		}
 
-		/*
-		if (now_step % 100 == 0) {
+		
+		if (now_step % 50 == 0) {
 			for (int i = 0; i < vapor.loc_x.size(); ++i) {
 				out_locx << vapor.loc_x[i];
 				out_locx << ",";
@@ -388,7 +446,7 @@ int main()
 			}
 			out_locx << endl;
 			out_locy << endl;
-		}*/
+		}
 		
 	}
 
@@ -396,6 +454,6 @@ int main()
 	out_locy.close();
 	int stop_s = clock();
 	cout << "time: " << (stop_s - start_s) / double(CLOCKS_PER_SEC) * 1000 << endl;
-	system("PAUSE");
+	//system("PAUSE");
 	return 0;
 }

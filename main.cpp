@@ -17,7 +17,7 @@
 
 
 #include <iostream>
-#include <math.h>
+#include <cmath>
 #include <vector>
 #include <tuple>
 #include <ctime>
@@ -35,12 +35,16 @@ struct Particle {
 	vector<float> vel_y;
 	vector<float> radius;
 	vector<float> interp;
-	vector<float> bubb_vx;
-	vector<float> bubb_vy;
+	vector<float> interp2x;
+	vector<float> interp2y;
+	vector<float> grad_vx;
+	vector<float> grad_vy;
+	vector<float> lap_vx;
+	vector<float> lap_vy;
 	vector<int> region;
 };
 
-Particle createVapor(int num, int par_wid, float par_mass, float par_radius, float par_vel)
+Particle createVapor(int num, int par_wid, float par_mass, float par_radius, float par_vel, float par_ins)
 {	
 		vector<float> mass(num);
 		vector<float> loc_x(num);
@@ -49,8 +53,12 @@ Particle createVapor(int num, int par_wid, float par_mass, float par_radius, flo
 		vector<float> vel_y(num);
 		vector<float> radius(num);
 		vector<float> interp(num);
-		vector<float> bubb_vx(num);
-		vector<float> bubb_vy(num);
+		vector<float> interp2x(num);
+		vector<float> interp2y(num);
+		vector<float> grad_vx(num);
+		vector<float> grad_vy(num);
+		vector<float> lap_vx(num);
+		vector<float> lap_vy(num);
 		vector<int> region(num);
 		
 		int par_len = num / par_wid;
@@ -58,20 +66,24 @@ Particle createVapor(int num, int par_wid, float par_mass, float par_radius, flo
 
 		for (int i = 0; i< par_len; ++i) {
 			for (int j = 0; j < par_wid; ++j) {
-				loc_x[par_ord] = 1 + par_radius * 3 * pow(-1, j) * ceil(j / 2.0);
-				loc_y[par_ord] = 0.5 + par_radius * 3 * i;
+				loc_x[par_ord] = 1 + par_radius * par_ins * pow(-1, j) * ceil(j / 2.0);
+				loc_y[par_ord] = 0.45;// - par_radius * par_ins * i;
 				mass[par_ord] = par_mass;
-				vel_x[par_ord] = 0;
+				vel_x[par_ord] = 0.0f;
 				vel_y[par_ord] = par_vel;
 				radius[par_ord] = par_radius;
 				region[par_ord] = -1;
-				interp[par_ord] = 0.0;
-				bubb_vx[par_ord] = 0.0;
-				bubb_vy[par_ord] = 0.0;
+				interp[par_ord] = 0.0f;
+				interp2x[par_ord] = 0.0f;
+				interp2y[par_ord] = 0.0f;
+				grad_vx[par_ord] = 0.0f;
+				grad_vy[par_ord] = 0.0f;
+				lap_vx[par_ord] = 0.0f;
+				lap_vy[par_ord] = 0.0f;
 				par_ord++;
 			}
 		}
-		return{ mass, loc_x, loc_y, vel_x, vel_y, radius, interp, bubb_vx, bubb_vy, region };
+		return{ mass, loc_x, loc_y, vel_x, vel_y, radius, interp, interp2x, interp2y, grad_vx, grad_vy, lap_vx, lap_vy, region };
 
 }
 
@@ -158,58 +170,42 @@ Configure createTube(float w, float r, float m)
 // update vapor velocity affected by drag forces
 void updateState(Particle * vpp, float dt, int num)
 {	
-	float dec_x = 0;
-	float dec_y = 0;
+	float dec_x = 0.0f;
+	float dec_y = 0.0f;
 	
 	// bubble deceleration or acceleration due to forces
-	float a = 9.8 * (1000 - 48.7) / 48.7;
-	float b = 3.0 / 8.0 * 0.44 * 1000 / 48.7;
-
-	float abs_a, abs_b, rel_vx, rel_vy;
 
 	for (int i = 0; i < num; ++i) {
 		vpp->loc_x[i] += vpp->vel_x[i] * dt;
 		vpp->loc_y[i] += vpp->vel_y[i] * dt;
+
+		dec_x = -vpp->grad_vx[i] + 0.007 * vpp->lap_vx[i] / 48.7;
+		dec_y = -vpp->grad_vy[i] + 0.007 * vpp->lap_vy[i] / 48.7 + (920 - 48.7) / 48.7 * 9.8;
 		
-		rel_vx = vpp->bubb_vx[i] - vpp->vel_x[i];
-		rel_vy = vpp->bubb_vy[i] - vpp->vel_y[i];
-
-		if (rel_vx >=0) {
-			abs_a = -1;
-		}
-		else {
-			abs_a = 1;
-		}
-
-		if (rel_vy >=0) {
-			abs_b = -1;
-		}
-		else {
-			abs_b = 1;
-		}
-
-		dec_x = b * abs_a * pow(rel_vx,2) / vpp->radius[i];
-		dec_y = b * abs_b * pow(rel_vy,2) / vpp->radius[i];
-
-		/*
-		cout << vpp->bubb_vx[i] << endl;
-		cout << vpp->bubb_vy[i] << endl;
-		cout << vpp->vel_y[i] << endl;
-		cout << dec_y << endl;
-		cout << dec_x << endl;
-		*/
-
-		vpp->vel_x[i] += dec_x * dt;
-		vpp->vel_y[i] += dec_y * dt;
+		//cout << dec_x << endl;
+		//cout << dec_y << endl;
+		
+		//cout << vpp->loc_x[i] << endl;
+		//cout << vpp->loc_y[i] << endl;
+		
+		
+		//vpp->vel_x[i] += dec_x * dt;
+		//vpp->vel_y[i] += dec_y * dt;
+		
 
 		// initial flow-phase values
-		vpp->interp[i] = 0.0;
-		vpp->bubb_vx[i] = 0.0;
-		vpp->bubb_vy[i] = 0.0;
+		vpp->interp[i] = 0.0f;
+		vpp->interp2x[i] = 0.0f;
+		vpp->interp2y[i] = 0.0f;
+		vpp->grad_vx[i] = 0.0f;
+		vpp->grad_vy[i] = 0.0f;
+		vpp->lap_vx[i] = 0.0f;
+		vpp->lap_vy[i] = 0.0f;
 		//cout << vpp->vel_y[i] << endl;
 	}
 }
 
+/*
 // vapor inter-collision model
 void vaporCollision(Particle * vpp, int num, int elastic = 1)
 {	
@@ -280,6 +276,76 @@ void vaporCollision(Particle * vpp, int num, int elastic = 1)
 		}
 	}
 }
+*/
+
+
+
+// vapor inter-collision model
+void vaporCollision(Particle * vpp, int num, int elastic = 1)
+{	
+	float dis_x, dis_y, dis, dis_safe, dis_ref, rel_vx, rel_vy, weight;
+	dis_ref = 0.002; // reference redius
+	for (int i = 0; i < num; ++i) {
+		// if particle 1 leaks out
+		if (vpp->region[i] == -2) {
+			continue;
+		}
+		
+		for (int j = 0; j < num; ++j) {
+			// if particle 2 leaks out
+			if (vpp->region[j] == -2 || j == i) {
+				continue;
+			}
+			dis_x = vpp->loc_x[j] - vpp->loc_x[i];
+			dis_y = vpp->loc_y[j] - vpp->loc_y[i];
+			// if the horizontal distance is beyond a safe distance
+			if (dis_x > dis_ref || dis_y > dis_ref) {
+				continue;
+			}
+			
+			dis = sqrt(pow(dis_x,2) + pow(dis_y,2));
+			
+			if (dis <= dis_ref) {
+				rel_vx = vpp->vel_x[j] - vpp->vel_x[i];
+				rel_vy = vpp->vel_y[j] - vpp->vel_y[i];
+				weight = (dis_ref / dis - 1);
+				
+				// gradient of velocity
+				vpp->grad_vx[i] += rel_vx / dis / dis * dis_x * weight;
+				vpp->grad_vy[i] += rel_vy / dis / dis * dis_y * weight;
+				
+				// laplacian of velocity
+				vpp->lap_vx[i] += rel_vx * weight;
+				vpp->lap_vy[i] += rel_vy * weight;
+				
+				// cumulation of interpolation factors
+				vpp->interp[i] += weight;
+				vpp->interp2x[i] += dis * dis * weight;
+				vpp->interp2y[i] += dis * dis * weight;
+			}
+			
+			
+			
+		}
+		// average by total coefficient
+
+		if (vpp->interp[i] > 1e-6) {
+			vpp->grad_vx[i]  = 2 * vpp->grad_vx[i] / vpp->interp[i];
+			vpp->grad_vy[i]  = 2 * vpp->grad_vy[i] / vpp->interp[i];
+			vpp->lap_vx[i]  = 2 * 2 * vpp->lap_vx[i] / vpp->interp2x[i];
+			vpp->lap_vy[i]  = 2 * 2 * vpp->lap_vy[i] / vpp->interp2y[i];
+		}
+		else {
+			vpp->grad_vx[i] = 0.0f;
+			vpp->grad_vy[i] = 0.0f;
+			vpp->lap_vx[i] = 0.0f;
+			vpp->lap_vy[i] = 0.0f;
+		}
+		//cout << vpp->lap_vx[i] << endl;
+		//cout << vpp->lap_vy[i] << endl;
+	}
+}
+
 
 
 /*****************************************************************************/
@@ -356,11 +422,11 @@ int main()
 	float dt = 1e-6;
 
 	// define simulation step
-	signed int steps = 10000;
+	signed int steps = 6000;
 	signed int now_step = 1;
 
 	// particle number smaller than 65535
-	signed short int par_num = 50;
+	signed short int par_num = 200;
 	signed short int par_wid = 5;
 
 	// model width per border [m]
@@ -368,7 +434,10 @@ int main()
 
 	// ratio of tube radius to each cell
 	float ratio = 0.5;
-
+	
+	// particle interstatial * radius
+	float par_ins = 3;
+	
 	// tube number per border
 	signed short int tube_per = 6;
 
@@ -392,7 +461,7 @@ int main()
 
 	Initialize input = initialCondition(dia_break, up_pre, down_pre, temp);
 
-	Particle vapor = createVapor(par_num, par_wid, input.ave_mass, input.ave_diam /2, input.ave_vel);
+	Particle vapor = createVapor(par_num, par_wid, input.ave_mass, input.ave_diam /2, input.ave_vel, par_ins);
 
 	Configure tube = createTube(width, ratio, tube_per);
 
@@ -403,15 +472,25 @@ int main()
 
 	ofstream out_locy;
 	out_locy.open("location_y.csv");
-
+	
+	int cur_num = 0;
 	for (int now_step = 0; now_step < steps; ++now_step){
 		//cout << now_step << endl;
-		vaporCollision(&vapor, par_num, elastic);
+		
+		// calculate the number of particles injected into sodium
+		if (cur_num < par_num) {
+			cur_num = ceil(input.ave_vel * dt * (now_step+1) / (par_ins * input.ave_diam / 2)) * par_wid;
+		}
+		else {
+			cur_num = par_num;
+		}
+		
+		vaporCollision(&vapor, cur_num, elastic);
 
-		updateState(&vapor, dt, par_num);
+		updateState(&vapor, dt, cur_num);
 
 		if (now_step % 10 != 0) {
-			for (int p = 0; p < par_num; ++p) {
+			for (int p = 0; p < cur_num; ++p) {
 				int b = vapor.region[p];
 				if (b > 1) {
 					tubeCollision(&vapor, &tube, p, b);
@@ -419,7 +498,7 @@ int main()
 			}
 		}
 		else {
-			for (int p = 0; p < par_num; ++p) {
+			for (int p = 0; p < cur_num; ++p) {
 				if (vapor.region[p] != -2) {
 					int flag = 0;
 					for (int b = 1; b < tube.total_num + 2; ++b) {

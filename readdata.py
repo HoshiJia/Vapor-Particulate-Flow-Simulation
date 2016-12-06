@@ -15,8 +15,8 @@ def update_particle(num):
     
 if __name__ == "__main__":
     global PlotX, PlotY
-    PlotX = np.zeros((49, 200),float)
-    PlotY = np.zeros((49, 200),float)
+    PlotX = np.zeros((199, 120),float)
+    PlotY = np.zeros((199, 120),float)
     
     f= open('location_x.csv','r')
 

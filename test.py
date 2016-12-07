@@ -9,14 +9,14 @@ import matplotlib.animation as animation
 import csv
 
 def update_particle(num):
-    v1.set_data(PlotX[:,59], PlotY[:,59])
+    v1.set_data(PlotX[:,10], PlotY[:,10])
     v1.set_markersize(1)
     v1.set_markerfacecolor([0.2,0.7,0.7])
     
 if __name__ == "__main__":
     global PlotX, PlotY
-    PlotX = np.zeros((1999, 120),float)
-    PlotY = np.zeros((1999, 120),float)
+    PlotX = np.zeros((3999, 100),float)
+    PlotY = np.zeros((3999, 100),float)
     
     f= open('location_x.csv','r')
 
@@ -35,16 +35,16 @@ if __name__ == "__main__":
         n += 1
     g.close()
 
-    l= open('tubelocpy.csv','r')
+    l= open('tubeloctest.csv','r')
 
     n=0
-    BLOC=np.zeros((3,95),float)
+    BLOC=np.zeros((3,2),float)
     for line in csv.reader(l):
         BLOC[:,n] = line
         n += 1
     l.close()
     
-    fig1 = plt.figure(figsize=(9, 8))
+    fig1 = plt.figure(figsize=(4.5, 4))
     
     l, = plt.plot([], [], 'r-')
 
@@ -56,8 +56,8 @@ if __name__ == "__main__":
         fig1.gca().add_artist(s)       
     #plt.xlim(0, 2)
     #plt.ylim(0, 2)
-    plt.xlim(-0.3, 0.3)
-    plt.ylim(-0.04, 0.5)
+    plt.xlim(-0.2, 0.2)
+    plt.ylim(-0.04, 0.3)
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title('Steam Generator')
